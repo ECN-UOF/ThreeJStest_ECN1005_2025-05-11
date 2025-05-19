@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>3D Walking Simulator</title>
     <style>
         body { margin: 0; overflow: hidden; }
@@ -15,6 +16,7 @@
             background-color: rgba(0,0,0,0.5);
             padding: 10px;
             font-family: Arial, sans-serif;
+            z-index: 100;
         }
     </style>
 </head>
@@ -25,6 +27,7 @@
         <p>Shift - Run/Move faster</p>
         <p>Mouse - Look around</p>
         <p>ESC - Toggle mouse lock</p>
+        <p>VR: Press trigger to move in direction controller is pointing</p>
     </div>
     <!-- Import Three.js from CDN -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>

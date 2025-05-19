@@ -1,5 +1,7 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.module.js';
-import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.132.2/examples/jsm/controls/PointerLockControls.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/XRControllerModelFactory.js';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -15,7 +17,13 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
+
+// Enable WebXR
+renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
+
+// Add VR button
+document.body.appendChild(VRButton.createButton(renderer));
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -88,7 +96,42 @@ for (let i = 0; i < 20; i++) {
     createTree(x, z);
 }
 
-// Controls
+// XR Controllers setup
+const controllerModelFactory = new XRControllerModelFactory();
+
+// Controller 1
+const controller1 = renderer.xr.getController(0);
+scene.add(controller1);
+
+const controllerGrip1 = renderer.xr.getControllerGrip(0);
+controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+scene.add(controllerGrip1);
+
+// Controller 2
+const controller2 = renderer.xr.getController(1);
+scene.add(controller2);
+
+const controllerGrip2 = renderer.xr.getControllerGrip(1);
+controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+scene.add(controllerGrip2);
+
+// Add a line for controller ray visualization
+const geometryLine = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -1)
+]);
+const materialLine = new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.5
+});
+
+const line = new THREE.Line(geometryLine, materialLine);
+line.scale.z = 5;
+controller1.add(line.clone());
+controller2.add(line.clone());
+
+// Controls for desktop mode
 const controls = new PointerLockControls(camera, document.body);
 scene.add(controls.getObject());
 
@@ -101,9 +144,17 @@ let moveLeft = false;
 let moveRight = false;
 let isRunning = false; // New flag to track if running
 
-// Event listeners
+// Add a user cameraGroup to move in VR
+const cameraGroup = new THREE.Group();
+cameraGroup.position.set(0, 0, 0);
+cameraGroup.add(camera);
+scene.add(cameraGroup);
+
+// Event listeners for desktop mode
 document.addEventListener('click', () => {
-    controls.lock();
+    if (!renderer.xr.isPresenting) {
+        controls.lock();
+    }
 });
 
 document.addEventListener('keydown', (event) => {
@@ -132,6 +183,23 @@ document.addEventListener('keyup', (event) => {
     }
 });
 
+// Controller event handlers for VR
+controller1.addEventListener('selectstart', onSelectStart);
+controller1.addEventListener('selectend', onSelectEnd);
+controller2.addEventListener('selectstart', onSelectStart);
+controller2.addEventListener('selectend', onSelectEnd);
+
+// Handle VR controller input
+let vrMoving = false;
+
+function onSelectStart() {
+    vrMoving = true;
+}
+
+function onSelectEnd() {
+    vrMoving = false;
+}
+
 // Handle window resize
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -143,15 +211,35 @@ window.addEventListener('resize', () => {
 const playerSpeed = 5.0; // Units per second
 const playerRadius = 0.5; // For collision detection
 const runMultiplier = 2.5; // Speed multiplier when running
+const vrSpeed = 3.0; // Speed in VR mode
 let prevTime = performance.now();
 
-// Animation loop
+// Animation loop for standard non-VR mode
 function animate() {
-    requestAnimationFrame(animate);
-    
+    renderer.setAnimationLoop(render);
+}
+
+// Render function that handles both VR and non-VR
+function render() {
     const time = performance.now();
     const delta = (time - prevTime) / 1000; // Convert to seconds
     
+    if (renderer.xr.isPresenting) {
+        // VR mode movement
+        handleVRMovement(delta);
+    } else {
+        // Desktop mode movement
+        handleDesktopMovement(delta);
+    }
+    
+    // Render the scene
+    renderer.render(scene, camera);
+    
+    prevTime = time;
+}
+
+// Handle desktop movement with keyboard
+function handleDesktopMovement(delta) {
     // Apply friction to slow down
     velocity.x -= velocity.x * 10.0 * delta;
     velocity.z -= velocity.z * 10.0 * delta;
@@ -181,11 +269,23 @@ function animate() {
     
     // Keep the player at eye height
     camera.position.y = 1.6;
-    
-    // Render the scene
-    renderer.render(scene, camera);
-    
-    prevTime = time;
+}
+
+// Handle VR movement with controllers
+function handleVRMovement(delta) {
+    if (vrMoving) {
+        // Get the direction the controller is pointing
+        const controller = renderer.xr.getController(0); // Primary controller
+        
+        // Use controller orientation to determine direction
+        const controllerDirection = new THREE.Vector3(0, 0, -1);
+        controllerDirection.applyQuaternion(controller.quaternion);
+        controllerDirection.y = 0; // Keep movement on the horizontal plane
+        controllerDirection.normalize();
+        
+        // Move in the direction the controller is pointing
+        cameraGroup.position.addScaledVector(controllerDirection, -vrSpeed * delta);
+    }
 }
 
 // Start the animation loop
