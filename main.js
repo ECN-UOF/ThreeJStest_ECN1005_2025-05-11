@@ -208,9 +208,9 @@ window.addEventListener('resize', () => {
 });
 
 // Movement variables
-const playerSpeed = 5.0; // Units per second
+const playerSpeed = 40.0; // Units per second
 const playerRadius = 0.5; // For collision detection
-const runMultiplier = 2.5; // Speed multiplier when running
+const runMultiplier = 4.5; // Speed multiplier when running
 const vrSpeed = 3.0; // Speed in VR mode
 let prevTime = performance.now();
 
@@ -284,7 +284,7 @@ function handleVRMovement(delta) {
         controllerDirection.normalize();
         
         // Move in the direction the controller is pointing
-        cameraGroup.position.addScaledVector(controllerDirection, -vrSpeed * delta);
+        cameraGroup.position.addScaledVector(controllerDirection, vrSpeed * delta);
     }
 }
 
